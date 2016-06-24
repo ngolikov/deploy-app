@@ -26,7 +26,8 @@ program
 			//debugger;
 			var r1 = JSON.parse(body1);
 			var exitCode1 = (r1.success === true) ? 0 : 1;
-			process.exit(exitCode1);
+      process.exit(1);
+			//process.exit(exitCode1);
   		});
   	} else if (action === 'delete') {
   		console.log('executing [%s] : [%s]', action, appid);
@@ -41,7 +42,8 @@ program
 			//debugger;
 			var r2 = JSON.parse(body2);
 			var exitCode2 = (r2.success === true) ? 0 : 1;
-			process.exit(exitCode2);
+      process.exit(1);
+			//process.exit(exitCode2);
   		});
   	} else {
   		console.log('unknown action [%s]. Valid actions: create|delete', action);
