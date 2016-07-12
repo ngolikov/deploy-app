@@ -1,51 +1,80 @@
 'use strict';
 
 var request = require('request');
-var program = require('commander');
+var jsyaml = require('js-yaml');
 
-console.log('deploying..');
+var BASE_URL = 'http://ngolikov0l:1234/';
+var DEPLOYER_API = BASE_URL + 'env/%s/app/%s';
+var ENVIRONMENTS_API = BASE_URL + 'env';
 
-var DEPLOYER_URL = 'http://ngolikov0l:1234/';
-var DEPLOYER_REQUEST = { method: '', url: '', headers: { 'Content-Type': 'application/json' }}
+var REQUEST_OPTS = { method: '', url: '', headers: { 'Content-Type': 'application/json' }};
 
-program  
-  .arguments('<action>')
-  .arguments('<appid>')
-  .action(function(action, appid) {
-  	action = action && action.toLowerCase ? action.toLowerCase() : action;
-  	if (action === 'create') {
-  		console.log('executing [%s] : [%s]', action, appid);  		
-  		var request_opts = DEPLOYER_REQUEST;
-  		request_opts.url = DEPLOYER_URL + 'env/1/app/' + appid;
-  		request_opts.method = 'POST';
-  		request(request_opts, function(err1, resp1, body1) {
-			if (err1) { 
-				console.log('err1 creating app: ' + err1);								
-				process.exit(1);
-			}
-			//debugger;
-			var r1 = JSON.parse(body1);
-			var exitCode1 = (r1.success === true) ? 0 : 1;
-			process.exit(exitCode1);
-  		});
-  	} else if (action === 'delete') {
-  		console.log('executing [%s] : [%s]', action, appid);
-  		var request_opts = DEPLOYER_REQUEST;
-  		request_opts.url = DEPLOYER_URL + 'env/1/app/' + appid;
-  		request_opts.method = 'DELETE';
-  		request(request_opts, function(err2, resp2, body2) {
-			if (err2) { 
-				console.log('err1 creating app: ' + err2);								
-				process.exit(1);
-			}
-			//debugger;
-			var r2 = JSON.parse(body2);
-			var exitCode2 = (r2.success === true) ? 0 : 1;
-			process.exit(exitCode2);
-  		});
-  	} else {
-  		console.log('unknown action [%s]. Valid actions: create|delete', action);
-  		process.exit(1);
-  	}  	  	
-  })
-  .parse(process.argv);
+var supported_actions = ['create', 'delete'];
+
+var argv = process.argv,
+    action = argv[2],
+    _appid = argv[3],
+    _envid = argv[4];
+
+if (!action || !_appid || !_envid) {
+  console.error(getUsageInfo());
+  process.exit(1);
+} else {
+  deploy(action, _appid, _envid);
+}
+
+function deploy(action, appid, envid) {    
+  // validate action 
+  action = action && action.toLowerCase ? action.toLowerCase() : action;    
+  if (supported_actions.indexOf(action) === -1) {
+    console.error('invalid action specified. valid actions are [' + supported_actions + ']. exiting..');
+    console.error(getUsageInfo());
+    process.exit(1);
+  }
+  // validate environement
+  request({ url: ENVIRONMENTS_API, method: 'GET' }, function(err, resp, body) {
+    if (err) {
+      console.error('unknown error fetching environments: ' + err);
+      process.exit(1);
+    }
+    var json_body = JSON.parse(body);
+    var environments = json_body.environments;
+    if (!environments || environments.length < 1) {
+      console.error('no environments returned by deployer. exiting..');
+      process.exit(1);
+    }
+    if (environments.indexOf(envid) === -1) {
+      console.error('invalid environment specified [' + envid + ']. valid environments are [' + environments + ']. exiting..');
+      process.exit(1);
+    }
+    console.log('executing [%s] : [%s]', action, appid);      
+    var request_opts = REQUEST_OPTS;
+    request_opts.url = parse(DEPLOYER_API, envid, appid);
+    request_opts.method = action === 'create' ? 'POST' : 'DELETE';
+    request(request_opts, function(err, resp, body) {
+      if (err) { 
+        console.error('err [%s] app: ' + err1, action);               
+        process.exit(1);
+      }
+      //debugger;
+      var json_body = JSON.parse(body);
+      var exitCode = (json_body.success === true) ? 0 : 1;
+      console.log('existing with exit code ' + exitCode);
+      process.exit(exitCode);
+    });
+  });               
+}  
+
+function getUsageInfo() {
+  return 'usage: ./node deploy.js <create|delete> <appid> <envid>';
+}
+
+/**
+ *  utility function to replace %s in a string with provided values
+ */
+function parse(str) {
+  var args = [].slice.call(arguments, 1), i = 0;
+  return str.replace(/%s/g, function() {
+      return args[i++];
+  });
+}
